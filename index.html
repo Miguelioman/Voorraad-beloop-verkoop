@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <title>Voorraad & Verkoop Dashboard (Excel upload)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Excel reader -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: #0b1220;
+      color: #0f172a;
+    }
+    header {
+      background: linear-gradient(90deg, #0b3954, #1f6feb);
+      color: #e5efff;
+      padding: 16px 20px;
+      box-shadow: 0 8px 20px rgba(0,0,0,.35);
+    }
+    header h1 { margin: 0; font-size: 20px; font-weight: 650; }
+    header p { margin: 6px 0 0; font-size: 13px; opacity: .92; }
+
+    .container {
+      max-width: 1400px;
+      margin: 16px auto 40px;
+      padding: 18px 18px 30px;
+      background: #ffffff;
+      border-radius: 18px;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 14px 30px rgba(15,23,42,.25);
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 16px;
+      align-items: flex-end;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      align-items: center;
+      margin: 12px 0 12px;
+    }
+
+    label {
+      font-size: 13px;
+      color: #0f172a;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    input[type="file"], select, input[type="number"] {
+      font-size: 13px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid #cbd5f5;
+      background: #f9fafb;
+      min-width: 220px;
+      outline: none;
+    }
+    input[type="number"] { min-width: 150px; }
+    input[type="file"]:focus, select:focus, input[type="number"]:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 2px rgba(37,99,235,.25);
+      background: #fff;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 999px;
+      background: #f8fafc;
+      font-size: 13px;
+      color: #0f172a;
+    }
+
+    .status {
+      font-size: 12px;
+      color: #475569;
+      margin-left: 6px;
+    }
+
+    .section {
+      margin-top: 18px;
+      padding-top: 10px;
+      border-top: 1px solid #e5e7eb;
+    }
+    .section h2 {
+      margin: 0 0 6px;
+      font-size: 15px;
+      color: #0b3954;
+    }
+    .section p {
+      margin: 0 0 10px;
+      font-size: 12px;
+      color: #475569;
+      line-height: 1.4;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+    @media (min-width: 1050px) {
+      .grid.two {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    .card {
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      background: #ffffff;
+      box-shadow: 0 8px 16px rgba(15,23,42,.08);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 10px 12px;
+      border-bottom: 1px solid #e5e7eb;
+      background: linear-gradient(90deg, #0b3954, #1f4f9a);
+      color: #e5efff;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-header .title {
+      font-size: 13px;
+      font-weight: 650;
+      margin: 0;
+    }
+    .card-header .actions {
+      display: inline-flex;
+      gap: 10px;
+      align-items: center;
+      font-size: 12px;
+    }
+    .card-body { padding: 10px 12px 12px; }
+
+    .canvas-wrap {
+      width: 100%;
+      overflow-x: auto;
+    }
+    canvas {
+      max-height: 420px;
+    }
+
+    .checkboxes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 10px;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      background: #f8fafc;
+    }
+    .checkboxes .group-title {
+      font-size: 12px;
+      font-weight: 650;
+      color: #0b3954;
+      margin-right: 8px;
+    }
+    .cb {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      font-size: 12px;
+      color: #0f172a;
+      user-select: none;
+    }
+    .cb input { margin: 0; }
+
+    .btn {
+      border: 1px solid #cbd5f5;
+      background: #ffffff;
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .btn:hover { background: #f1f5f9; }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      background: #fff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      min-width: 800px;
+    }
+    thead {
+      background: #0b3954;
+      color: #e5efff;
+    }
+    th, td {
+      padding: 7px 8px;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: left;
+      white-space: nowrap;
+    }
+    tbody tr:nth-child(even) { background: #f9fafb; }
+    tbody tr:hover { background: #e0ecff; }
+
+    .note {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 8px;
+      line-height: 1.4;
+    }
+
+    .hidden { display: none; }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Voorraad & Verkoop Dashboard</h1>
+    <p>Upload hetzelfde Excel-bestand (maand-sheets). Bekijk voorraadverloop, verkopen per maand en omzet (bruto/netto) per categorie.</p>
+  </header>
+
+  <div class="container">
+    <div class="controls">
+      <label>
+        Excel-bestand (.xlsx / .xls)
+        <input type="file" id="excelFileInput" accept=".xlsx,.xls" />
+      </label>
+
+      <span class="pill">
+        <strong>Maanden:</strong> <span id="monthsInfo" class="status">—</span>
+      </span>
+
+      <span id="statusMessage" class="status"></span>
+    </div>
+
+    <div id="categoryControls" class="checkboxes hidden">
+      <span class="group-title">Categoriën zichtbaar:</span>
+      <button class="btn" id="btnAllOn" type="button">Alles aan</button>
+      <button class="btn" id="btnAllOff" type="button">Alles uit</button>
+      <span class="status" id="catHint"></span>
+      <div id="categoryCheckboxList" style="display:flex; flex-wrap:wrap; gap:8px 10px; margin-left: 8px;"></div>
+    </div>
+
+    <div class="section">
+      <h2>1) Voorraadverloop per maand (Ending inventory units)</h2>
+      <p>Lijngrafiek met totale eindvoorraad per maand per productcategorie. Optioneel trendlines aan/uit. Inclusief tabel met exacte waarden.</p>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="title">Voorraad over tijd per categorie</div>
+          <div class="actions">
+            <label class="cb" style="background:transparent; border:0; color:#e5efff;">
+              <input type="checkbox" id="toggleTrendlines" />
+              Trendlines tonen
+            </label>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="canvas-wrap"><canvas id="inventoryLineChart"></canvas></div>
+          <div class="note">Voorraad = som van <strong>Ending inventory units</strong> per sheet/maand per categorie.</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 12px;">
+        <div class="card-header">
+          <div class="title">Tabel: eindvoorraad per maand per categorie</div>
+        </div>
+        <div class="card-body">
+          <div class="table-wrap">
+            <table id="inventoryTable">
+              <thead></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>2) Verkopen per maand per categorie (Inventory units sold)</h2>
+      <p>Gestapelde staafdiagram van totaal verkochte units per maand, uitgesplitst per productcategorie. Inclusief tabel met waarden.</p>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="title">Verkopen per maand per categorie</div>
+        </div>
+        <div class="card-body">
+          <div class="canvas-wrap"><canvas id="salesBarChart"></canvas></div>
+          <div class="note">Verkopen = som van <strong>Inventory units sold</strong> per maand per categorie.</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 12px;">
+        <div class="card-header">
+          <div class="title">Tabel: verkopen per maand per categorie</div>
+        </div>
+        <div class="card-body">
+          <div class="table-wrap">
+            <table id="salesTable">
+              <thead></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>3) Omzet per categorie (bruto / netto)</h2>
+      <p>
+        Staafdiagram van totale omzet per productcategorie. Kies <strong>bruto</strong> (units × verkoopprijs)
+        of <strong>netto</strong> (bruto − units × inkoopprijs). Inkoopprijzen zijn instelbaar.
+        Inclusief tabellen met bedragen én maandelijkse omzet-% per categorie.
+      </p>
+
+      <div class="controls" style="margin-top: 4px;">
+        <label>
+          Weergave
+          <select id="revenueModeSelect">
+            <option value="gross" selected>Bruto omzet</option>
+            <option value="net">Netto omzet (bruto - inkoop)</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="title">Omzet per categorie</div>
+        </div>
+        <div class="card-body">
+          <div class="canvas-wrap"><canvas id="revenueBarChart"></canvas></div>
+          <div class="note">Alle bedragen in euro’s (€). Prijzen/inkoop zijn per categorie gedefinieerd en instelbaar.</div>
+        </div>
+      </div>
+
+      <div class="grid two" style="margin-top: 12px;">
+        <div class="card">
+          <div class="card-header">
+            <div class="title">Instelbare inkoopprijzen (€) per categorie</div>
+          </div>
+          <div class="card-body" id="costInputsWrap">
+            <!-- dynamisch -->
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="title">Tabel: totale omzet per categorie</div>
+          </div>
+          <div class="card-body">
+            <div class="table-wrap">
+              <table id="revenueTable">
+                <thead></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="note">Tabel toont bruto én netto; de grafiek volgt jouw selectie (bruto/netto).</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 12px;">
+        <div class="card-header">
+          <div class="title">Tabel: omzet per categorie per maand als % van totale omzet die maand</div>
+        </div>
+        <div class="card-body">
+          <div class="table-wrap">
+            <table id="revenueShareTable">
+              <thead></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="note">Percentage is berekend per maand: (omzet categorie / totale omzet maand) × 100.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------- Helpers: categorie normalisatie + prijzen ----------
+    function canonicalizeProductType(raw) {
+      if (raw == null) return null;
+      const str = String(raw).trim();
+      if (!str) return null;
+      const t = str.toLowerCase();
+      if (t === 'nan') return null;
+
+      if (t.includes('compressiesok')) return 'compressiesokken';
+      if (t.includes('sneaker')) return 'sneakers';
+      if (t.includes('klomp') || t.includes('schoen')) return 'klompen';
+      if (t.includes('mok')) return 'mokken';
+      if (t.includes('sok')) return 'sokken';
+
+      return str;
+    }
+
+    // Verkoopprijzen (zoals jij vroeg)
+    function getSellPrice(cat) {
+      if (!cat) return 0;
+      const t = String(cat).toLowerCase();
+      if (t.includes('compressiesok')) return 29.99;
+      if (t.includes('sneaker')) return 99.99;
+      if (t.includes('klomp')) return 79.99;
+      if (t.includes('mok')) return 14.95;
+      if (t.includes('sok')) return 11.95;
+      return 0;
+    }
+
+    // Default inkoopprijzen (instelbaar)
+    const defaultCosts = {
+      'sokken': 2.00,
+      'compressiesokken': 2.00,
+      'mokken': 2.50,
+      'klompen': 18.00,
+      'sneakers': 18.00
+    };
+
+    function parseMonthLabel(label) {
+      if (!label) return null;
+      const str = String(label);
+      const parts = str.split(/[-\\/]/);
+      // verwacht mogelijk MM-YYYY of MM/YYYY
+      if (parts.length === 2) {
+        const m = parseInt(parts[0], 10);
+        const y = parseInt(parts[1], 10);
+        if (!isNaN(m) && !isNaN(y)) return new Date(y, m - 1, 1);
+      }
+      const d = new Date(str);
+      if (!isNaN(d.getTime())) return d;
+      return null;
+    }
+
+    function euro(n) {
+      const v = (n == null || !isFinite(n)) ? 0 : Number(n);
+      return v.toLocaleString('nl-NL', { style: 'currency', currency: 'EUR' });
+    }
+
+    function num(n, decimals=0) {
+      const v = (n == null || !isFinite(n)) ? 0 : Number(n);
+      return v.toLocaleString('nl-NL', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    }
+
+    function pct(n) {
+      const v = (n == null || !isFinite(n)) ? 0 : Number(n);
+      return v.toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+    }
+
+    function linearRegression(yValues) {
+      // x = 0..n-1
+      const n = yValues.length;
+      if (n < 2) return null;
+      let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+      for (let i = 0; i < n; i++) {
+        const x = i;
+        const y = Number(yValues[i]) || 0;
+        sumX += x; sumY += y; sumXY += x * y; sumXX += x * x;
+      }
+      const denom = (n * sumXX - sumX * sumX);
+      if (denom === 0) return null;
+      const slope = (n * sumXY - sumX * sumY) / denom;
+      const intercept = (sumY - slope * sumX) / n;
+      const fitted = [];
+      for (let i = 0; i < n; i++) fitted.push(intercept + slope * i);
+      return fitted;
+    }
+
+    // ---------- State ----------
+    const state = {
+      months: [],             // [{key,label,date}]
+      monthLabels: [],        // [label...]
+      categories: [],         // [cat...]
+      selectedCats: new Set(),
+      costs: {},              // cat -> cost
+      // aggregates:
+      inventory: {},          // monthLabel -> {cat: endingInvSum}
+      sales: {},              // monthLabel -> {cat: unitsSoldSum}
+      revenueGross: {},       // monthLabel -> {cat: gross}
+      revenueNet: {},         // monthLabel -> {cat: net}
+      // charts:
+      chartInventory: null,
+      chartSales: null,
+      chartRevenue: null
+    };
+
+    // ---------- DOM ----------
+    const excelFileInput = document.getElementById('excelFileInput');
+    const statusMessage = document.getElementById('statusMessage');
+    const monthsInfo = document.getElementById('monthsInfo');
+
+    const categoryControls = document.getElementById('categoryControls');
+    const categoryCheckboxList = document.getElementById('categoryCheckboxList');
+    const btnAllOn = document.getElementById('btnAllOn');
+    const btnAllOff = document.getElementById('btnAllOff');
+    const catHint = document.getElementById('catHint');
+
+    const toggleTrendlines = document.getElementById('toggleTrendlines');
+
+    const revenueModeSelect = document.getElementById('revenueModeSelect');
+    const costInputsWrap = document.getElementById('costInputsWrap');
+
+    const inventoryTable = document.getElementById('inventoryTable');
+    const salesTable = document.getElementById('salesTable');
+    const revenueTable = document.getElementById('revenueTable');
+    const revenueShareTable = document.getElementById('revenueShareTable');
+
+    // ---------- Main ----------
+    function setStatus(msg) { statusMessage.textContent = msg || ''; }
+
+    function resetCharts() {
+      if (state.chartInventory) { state.chartInventory.destroy(); state.chartInventory = null; }
+      if (state.chartSales) { state.chartSales.destroy(); state.chartSales = null; }
+      if (state.chartRevenue) { state.chartRevenue.destroy(); state.chartRevenue = null; }
+    }
+
+    function initCosts() {
+      const costs = {};
+      state.categories.forEach(cat => {
+        const key = String(cat).toLowerCase();
+        if (defaultCosts[key] != null) costs[cat] = defaultCosts[key];
+        else costs[cat] = 0;
+      });
+      state.costs = costs;
+    }
+
+    function buildCategoryControls() {
+      categoryCheckboxList.innerHTML = '';
+      state.selectedCats = new Set(state.categories); // default alles aan
+
+      state.categories.forEach(cat => {
+        const wrap = document.createElement('label');
+        wrap.className = 'cb';
+
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = true;
+        cb.dataset.cat = cat;
+
+        const span = document.createElement('span');
+        span.textContent = cat;
+
+        cb.addEventListener('change', () => {
+          if (cb.checked) state.selectedCats.add(cat);
+          else state.selectedCats.delete(cat);
+          renderAll();
+        });
+
+        wrap.appendChild(cb);
+        wrap.appendChild(span);
+        categoryCheckboxList.appendChild(wrap);
+      });
+
+      btnAllOn.onclick = () => {
+        state.selectedCats = new Set(state.categories);
+        [...categoryCheckboxList.querySelectorAll('input[type="checkbox"]')].forEach(c => c.checked = true);
+        renderAll();
+      };
+      btnAllOff.onclick = () => {
+        state.selectedCats = new Set();
+        [...categoryCheckboxList.querySelectorAll('input[type="checkbox"]')].forEach(c => c.checked = false);
+        renderAll();
+      };
+
+      catHint.textContent = ' (toggle beïnvloedt alle grafieken & tabellen)';
+      categoryControls.classList.remove('hidden');
+    }
+
+    function buildCostInputs() {
+      costInputsWrap.innerHTML = '';
+      const box = document.createElement('div');
+      box.className = 'row';
+
+      state.categories.forEach(cat => {
+        const lab = document.createElement('label');
+        lab.style.minWidth = '240px';
+        lab.textContent = `${cat} (inkoopprijs)`;
+
+        const inp = document.createElement('input');
+        inp.type = 'number';
+        inp.step = '0.01';
+        inp.value = (state.costs[cat] != null ? state.costs[cat] : 0);
+        inp.addEventListener('input', () => {
+          const v = parseFloat(inp.value);
+          state.costs[cat] = isFinite(v) ? v : 0;
+          recomputeRevenueNet();
+          renderRevenue();
+        });
+
+        lab.appendChild(inp);
+        box.appendChild(lab);
+      });
+
+      costInputsWrap.appendChild(box);
+
+      const note = document.createElement('div');
+      note.className = 'note';
+      note.textContent = 'Netto omzet = (units × verkoopprijs) − (units × inkoopprijs).';
+      costInputsWrap.appendChild(note);
+    }
+
+    function recomputeRevenueNet() {
+      // recompute net from gross + costs using stored sales
+      const revNet = {};
+      state.monthLabels.forEach(m => {
+        revNet[m] = {};
+        state.categories.forEach(cat => {
+          const units = (state.sales[m] && state.sales[m][cat]) ? state.sales[m][cat] : 0;
+          const gross = (state.revenueGross[m] && state.revenueGross[m][cat]) ? state.revenueGross[m][cat] : 0;
+          const cost = state.costs[cat] != null ? state.costs[cat] : 0;
+          revNet[m][cat] = gross - (units * cost);
+        });
+      });
+      state.revenueNet = revNet;
+    }
+
+    function extractAndAggregate(workbook) {
+      const months = [];
+
+      workbook.SheetNames.forEach(name => {
+        const sheet = workbook.Sheets[name];
+        if (!sheet) return;
+
+        const json = XLSX.utils.sheet_to_json(sheet, { defval: null });
+        const entries = [];
+
+        json.forEach(row => {
+          const productType = canonicalizeProductType(row['Product type']);
+          if (!productType) return;
+
+          let endingInv = Number(row['Ending inventory units']);
+          if (!isFinite(endingInv)) endingInv = 0;
+
+          let unitsSold = Number(row['Inventory units sold']);
+          if (!isFinite(unitsSold)) unitsSold = 0;
+
+          entries.push({ productType, endingInv, unitsSold });
+        });
+
+        months.push({
+          key: name,
+          label: name,
+          date: parseMonthLabel(name),
+          entries
+        });
+      });
+
+      // sort months
+      months.sort((a, b) => {
+        if (a.date && b.date) return a.date - b.date;
+        if (a.date && !b.date) return -1;
+        if (!a.date && b.date) return 1;
+        return a.label.localeCompare(b.label, 'nl-NL');
+      });
+
+      state.months = months;
+      state.monthLabels = months.map(m => m.label);
+      monthsInfo.textContent = state.monthLabels.length ? state.monthLabels.join(', ') : '—';
+
+      // categories set
+      const catSet = new Set();
+      months.forEach(m => m.entries.forEach(e => catSet.add(e.productType)));
+      state.categories = Array.from(catSet).sort((a, b) => a.localeCompare(b, 'nl-NL'));
+
+      // init empty structures
+      const inventory = {};
+      const sales = {};
+      const revenueGross = {};
+      state.monthLabels.forEach(ml => {
+        inventory[ml] = {};
+        sales[ml] = {};
+        revenueGross[ml] = {};
+        state.categories.forEach(cat => {
+          inventory[ml][cat] = 0;
+          sales[ml][cat] = 0;
+          revenueGross[ml][cat] = 0;
+        });
+      });
+
+      // aggregate
+      months.forEach(m => {
+        const ml = m.label;
+        m.entries.forEach(e => {
+          inventory[ml][e.productType] += e.endingInv;
+          sales[ml][e.productType] += e.unitsSold;
+
+          const price = getSellPrice(e.productType);
+          revenueGross[ml][e.productType] += (e.unitsSold * price);
+        });
+      });
+
+      state.inventory = inventory;
+      state.sales = sales;
+      state.revenueGross = revenueGross;
+
+      // costs + net revenue
+      initCosts();
+      recomputeRevenueNet();
+
+      // category UI
+      buildCategoryControls();
+      buildCostInputs();
+    }
+
+    // ---------- Rendering ----------
+    function visibleCats() {
+      return state.categories.filter(c => state.selectedCats.has(c));
+    }
+
+    function buildLineDatasetsForInventory(showTrend) {
+      const cats = visibleCats();
+      const labels = state.monthLabels;
+
+      const datasets = [];
+
+      cats.forEach(cat => {
+        const data = labels.map(m => (state.inventory[m] && state.inventory[m][cat]) ? state.inventory[m][cat] : 0);
+        datasets.push({
+          label: cat,
+          data,
+          tension: 0.2,
+          borderWidth: 2,
+          pointRadius: 2
+        });
+
+        if (showTrend) {
+          const fitted = linearRegression(data);
+          if (fitted) {
+            datasets.push({
+              label: `${cat} (trend)`,
+              data: fitted,
+              tension: 0,
+              borderWidth: 2,
+              borderDash: [6, 6],
+              pointRadius: 0
+            });
+          }
+        }
+      });
+
+      return datasets;
+    }
+
+    function renderInventory() {
+      // chart
+      const ctx = document.getElementById('inventoryLineChart');
+      const showTrend = !!toggleTrendlines.checked;
+
+      if (state.chartInventory) state.chartInventory.destroy();
+
+      state.chartInventory = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: state.monthLabels,
+          datasets: buildLineDatasetsForInventory(showTrend)
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom' },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.dataset.label}: ${num(ctx.parsed.y, 0)}`
+              }
+            }
+          },
+          scales: {
+            y: {
+              title: { display: true, text: 'Eindvoorraad (units)' },
+              ticks: { callback: (v) => num(v, 0) }
+            },
+            x: { title: { display: true, text: 'Maand' } }
+          }
+        }
+      });
+
+      // table
+      const cats = visibleCats();
+      const thead = inventoryTable.querySelector('thead');
+      const tbody = inventoryTable.querySelector('tbody');
+      thead.innerHTML = '';
+      tbody.innerHTML = '';
+
+      const hr = document.createElement('tr');
+      const th0 = document.createElement('th');
+      th0.textContent = 'Maand';
+      hr.appendChild(th0);
+      cats.forEach(cat => {
+        const th = document.createElement('th');
+        th.textContent = cat;
+        hr.appendChild(th);
+      });
+      thead.appendChild(hr);
+
+      state.monthLabels.forEach(m => {
+        const tr = document.createElement('tr');
+        const tdM = document.createElement('td');
+        tdM.textContent = m;
+        tr.appendChild(tdM);
+
+        cats.forEach(cat => {
+          const td = document.createElement('td');
+          td.textContent = num(state.inventory[m][cat] || 0, 0);
+          tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderSales() {
+      // stacked bar
+      const ctx = document.getElementById('salesBarChart');
+
+      if (state.chartSales) state.chartSales.destroy();
+
+      const cats = visibleCats();
+      const labels = state.monthLabels;
+
+      const datasets = cats.map(cat => ({
+        label: cat,
+        data: labels.map(m => (state.sales[m] && state.sales[m][cat]) ? state.sales[m][cat] : 0)
+      }));
+
+      state.chartSales = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom' },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.dataset.label}: ${num(ctx.parsed.y, 0)}`
+              }
+            }
+          },
+          scales: {
+            x: { stacked: true, title: { display: true, text: 'Maand' } },
+            y: { stacked: true, title: { display: true, text: 'Verkochte units' }, ticks: { callback: (v) => num(v, 0) } }
+          }
+        }
+      });
+
+      // table
+      const thead = salesTable.querySelector('thead');
+      const tbody = salesTable.querySelector('tbody');
+      thead.innerHTML = '';
+      tbody.innerHTML = '';
+
+      const hr = document.createElement('tr');
+      const th0 = document.createElement('th');
+      th0.textContent = 'Maand';
+      hr.appendChild(th0);
+      cats.forEach(cat => {
+        const th = document.createElement('th');
+        th.textContent = cat;
+        hr.appendChild(th);
+      });
+      thead.appendChild(hr);
+
+      labels.forEach(m => {
+        const tr = document.createElement('tr');
+        const tdM = document.createElement('td');
+        tdM.textContent = m;
+        tr.appendChild(tdM);
+
+        cats.forEach(cat => {
+          const td = document.createElement('td');
+          td.textContent = num(state.sales[m][cat] || 0, 0);
+          tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    function totalByCategory(mapMonthCat) {
+      const totals = {};
+      state.categories.forEach(cat => totals[cat] = 0);
+      state.monthLabels.forEach(m => {
+        state.categories.forEach(cat => {
+          totals[cat] += (mapMonthCat[m] && mapMonthCat[m][cat]) ? mapMonthCat[m][cat] : 0;
+        });
+      });
+      return totals;
+    }
+
+    function renderRevenue() {
+      const mode = revenueModeSelect.value; // gross | net
+      const monthCat = (mode === 'net') ? state.revenueNet : state.revenueGross;
+
+      // chart (bar by category)
+      const ctx = document.getElementById('revenueBarChart');
+      if (state.chartRevenue) state.chartRevenue.destroy();
+
+      const cats = visibleCats();
+      const totals = totalByCategory(monthCat);
+
+      state.chartRevenue = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: cats,
+          datasets: [{
+            label: mode === 'net' ? 'Netto omzet' : 'Bruto omzet',
+            data: cats.map(cat => totals[cat] || 0)
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: true, position: 'bottom' },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.dataset.label}: ${euro(ctx.parsed.y)}`
+              }
+            }
+          },
+          scales: {
+            y: { title: { display: true, text: 'Omzet (€)' }, ticks: { callback: (v) => euro(v) } },
+            x: { title: { display: true, text: 'Productcategorie' } }
+          }
+        }
+      });
+
+      // revenue totals table (gross + net)
+      const revHead = revenueTable.querySelector('thead');
+      const revBody = revenueTable.querySelector('tbody');
+      revHead.innerHTML = '';
+      revBody.innerHTML = '';
+
+      const trH = document.createElement('tr');
+      ['Categorie', 'Verkoopprijs', 'Inkoopprijs', 'Bruto omzet', 'Netto omzet'].forEach(h => {
+        const th = document.createElement('th');
+        th.textContent = h;
+        trH.appendChild(th);
+      });
+      revHead.appendChild(trH);
+
+      const totalsGross = totalByCategory(state.revenueGross);
+      const totalsNet = totalByCategory(state.revenueNet);
+
+      cats.forEach(cat => {
+        const tr = document.createElement('tr');
+
+        const tdC = document.createElement('td'); tdC.textContent = cat; tr.appendChild(tdC);
+        const tdP = document.createElement('td'); tdP.textContent = euro(getSellPrice(cat)); tr.appendChild(tdP);
+        const tdCost = document.createElement('td'); tdCost.textContent = euro(state.costs[cat] || 0); tr.appendChild(tdCost);
+        const tdG = document.createElement('td'); tdG.textContent = euro(totalsGross[cat] || 0); tr.appendChild(tdG);
+        const tdN = document.createElement('td'); tdN.textContent = euro(totalsNet[cat] || 0); tr.appendChild(tdN);
+
+        revBody.appendChild(tr);
+      });
+
+      // revenue share table (% of total per month)
+      const shareHead = revenueShareTable.querySelector('thead');
+      const shareBody = revenueShareTable.querySelector('tbody');
+      shareHead.innerHTML = '';
+      shareBody.innerHTML = '';
+
+      const trHS = document.createElement('tr');
+      const thM = document.createElement('th');
+      thM.textContent = 'Maand';
+      trHS.appendChild(thM);
+      cats.forEach(cat => {
+        const th = document.createElement('th');
+        th.textContent = cat;
+        trHS.appendChild(th);
+      });
+      shareHead.appendChild(trHS);
+
+      state.monthLabels.forEach(m => {
+        const tr = document.createElement('tr');
+        const tdMonth = document.createElement('td');
+        tdMonth.textContent = m;
+        tr.appendChild(tdMonth);
+
+        // total revenue that month (use gross for shares by default; you can change to net if you prefer)
+        const monthTotal = cats.reduce((s, cat) => s + ((state.revenueGross[m] && state.revenueGross[m][cat]) ? state.revenueGross[m][cat] : 0), 0);
+
+        cats.forEach(cat => {
+          const val = (state.revenueGross[m] && state.revenueGross[m][cat]) ? state.revenueGross[m][cat] : 0;
+          const share = monthTotal > 0 ? (val / monthTotal) * 100 : 0;
+          const td = document.createElement('td');
+          td.textContent = pct(share);
+          tr.appendChild(td);
+        });
+
+        shareBody.appendChild(tr);
+      });
+    }
+
+    function renderAll() {
+      if (!state.monthLabels.length) return;
+      renderInventory();
+      renderSales();
+      renderRevenue();
+    }
+
+    // ---------- Events ----------
+    excelFileInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      setStatus('Bezig met inlezen van het Excel-bestand...');
+      resetCharts();
+
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const data = new Uint8Array(evt.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          extractAndAggregate(workbook);
+
+          setStatus(`Bestand geladen: ${file.name}`);
+          renderAll();
+        } catch (err) {
+          console.error(err);
+          setStatus('Fout bij het inlezen: ' + (err && err.message ? err.message : String(err)));
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    toggleTrendlines.addEventListener('change', () => {
+      renderInventory();
+    });
+
+    revenueModeSelect.addEventListener('change', () => {
+      renderRevenue();
+    });
+  </script>
+</body>
+</html>
