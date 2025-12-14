@@ -154,13 +154,27 @@
     }
     .card-body { padding: 10px 12px 12px; }
 
+    /* >>> Grotere grafieken + betere as-leesbaarheid <<< */
     .canvas-wrap {
       width: 100%;
       overflow-x: auto;
+      padding: 6px 2px 2px;
     }
-    canvas {
-      max-height: 420px;
+    .chart-box {
+      min-width: 920px;           /* voorkomt dat alles te smal wordt */
+      height: 520px;              /* standaard hoog en leesbaar */
     }
+    .chart-box.tall {
+      height: 600px;              /* extra hoog voor lijngrafiek */
+    }
+    @media (max-width: 980px) {
+      .chart-box { min-width: 860px; }
+    }
+    @media (max-width: 720px) {
+      .chart-box { min-width: 760px; height: 520px; }
+      .chart-box.tall { height: 560px; }
+    }
+    canvas { width: 100% !important; height: 100% !important; }
 
     .checkboxes {
       display: flex;
@@ -212,7 +226,7 @@
       width: 100%;
       border-collapse: collapse;
       font-size: 12px;
-      min-width: 800px;
+      min-width: 900px;
     }
     thead {
       background: #0b3954;
@@ -281,7 +295,11 @@
           </div>
         </div>
         <div class="card-body">
-          <div class="canvas-wrap"><canvas id="inventoryLineChart"></canvas></div>
+          <div class="canvas-wrap">
+            <div class="chart-box tall">
+              <canvas id="inventoryLineChart"></canvas>
+            </div>
+          </div>
           <div class="note">Voorraad = som van <strong>Ending inventory units</strong> per sheet/maand per categorie.</div>
         </div>
       </div>
@@ -310,7 +328,11 @@
           <div class="title">Verkopen per maand per categorie</div>
         </div>
         <div class="card-body">
-          <div class="canvas-wrap"><canvas id="salesBarChart"></canvas></div>
+          <div class="canvas-wrap">
+            <div class="chart-box">
+              <canvas id="salesBarChart"></canvas>
+            </div>
+          </div>
           <div class="note">Verkopen = som van <strong>Inventory units sold</strong> per maand per categorie.</div>
         </div>
       </div>
@@ -350,11 +372,30 @@
 
       <div class="card">
         <div class="card-header">
-          <div class="title">Omzet per categorie</div>
+          <div class="title">Omzet per categorie (totaal)</div>
         </div>
         <div class="card-body">
-          <div class="canvas-wrap"><canvas id="revenueBarChart"></canvas></div>
+          <div class="canvas-wrap">
+            <div class="chart-box">
+              <canvas id="revenueBarChart"></canvas>
+            </div>
+          </div>
           <div class="note">Alle bedragen in euro’s (€). Prijzen/inkoop zijn per categorie gedefinieerd en instelbaar.</div>
+        </div>
+      </div>
+
+      <!-- NIEUW: omzet per maand per categorie (stacked bar) -->
+      <div class="card" style="margin-top: 12px;">
+        <div class="card-header">
+          <div class="title">Omzet per maand per categorie (bruto / netto)</div>
+        </div>
+        <div class="card-body">
+          <div class="canvas-wrap">
+            <div class="chart-box">
+              <canvas id="revenueMonthBarChart"></canvas>
+            </div>
+          </div>
+          <div class="note">Deze grafiek volgt dezelfde keuze (bruto/netto) als hierboven.</div>
         </div>
       </div>
 
@@ -363,9 +404,7 @@
           <div class="card-header">
             <div class="title">Instelbare inkoopprijzen (€) per categorie</div>
           </div>
-          <div class="card-body" id="costInputsWrap">
-            <!-- dynamisch -->
-          </div>
+          <div class="card-body" id="costInputsWrap"></div>
         </div>
 
         <div class="card">
@@ -386,7 +425,7 @@
 
       <div class="card" style="margin-top: 12px;">
         <div class="card-header">
-          <div class="title">Tabel: omzet per categorie per maand als % van totale omzet die maand</div>
+          <div class="title">Tabel: omzet per categorie per maand als % van totale omzet per maand</div>
         </div>
         <div class="card-body">
           <div class="table-wrap">
@@ -395,14 +434,14 @@
               <tbody></tbody>
             </table>
           </div>
-          <div class="note">Percentage is berekend per maand: (omzet categorie / totale omzet maand) × 100.</div>
+          <div class="note">Percentage per maand: (omzet categorie / totale omzet maand) × 100 (op basis van bruto).</div>
         </div>
       </div>
     </div>
   </div>
 
   <script>
-    // ---------- Helpers: categorie normalisatie + prijzen ----------
+    // ---------- Helpers ----------
     function canonicalizeProductType(raw) {
       if (raw == null) return null;
       const str = String(raw).trim();
@@ -415,11 +454,9 @@
       if (t.includes('klomp') || t.includes('schoen')) return 'klompen';
       if (t.includes('mok')) return 'mokken';
       if (t.includes('sok')) return 'sokken';
-
       return str;
     }
 
-    // Verkoopprijzen (zoals jij vroeg)
     function getSellPrice(cat) {
       if (!cat) return 0;
       const t = String(cat).toLowerCase();
@@ -431,7 +468,6 @@
       return 0;
     }
 
-    // Default inkoopprijzen (instelbaar)
     const defaultCosts = {
       'sokken': 2.00,
       'compressiesokken': 2.00,
@@ -444,7 +480,6 @@
       if (!label) return null;
       const str = String(label);
       const parts = str.split(/[-\\/]/);
-      // verwacht mogelijk MM-YYYY of MM/YYYY
       if (parts.length === 2) {
         const m = parseInt(parts[0], 10);
         const y = parseInt(parts[1], 10);
@@ -459,52 +494,56 @@
       const v = (n == null || !isFinite(n)) ? 0 : Number(n);
       return v.toLocaleString('nl-NL', { style: 'currency', currency: 'EUR' });
     }
-
     function num(n, decimals=0) {
       const v = (n == null || !isFinite(n)) ? 0 : Number(n);
       return v.toLocaleString('nl-NL', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
     }
-
     function pct(n) {
       const v = (n == null || !isFinite(n)) ? 0 : Number(n);
       return v.toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
     }
 
     function linearRegression(yValues) {
-      // x = 0..n-1
       const n = yValues.length;
       if (n < 2) return null;
-      let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
-      for (let i = 0; i < n; i++) {
-        const x = i;
-        const y = Number(yValues[i]) || 0;
-        sumX += x; sumY += y; sumXY += x * y; sumXX += x * x;
+      let sumX=0,sumY=0,sumXY=0,sumXX=0;
+      for (let i=0;i<n;i++){
+        const x=i;
+        const y=Number(yValues[i])||0;
+        sumX+=x; sumY+=y; sumXY+=x*y; sumXX+=x*x;
       }
-      const denom = (n * sumXX - sumX * sumX);
+      const denom = (n*sumXX - sumX*sumX);
       if (denom === 0) return null;
-      const slope = (n * sumXY - sumX * sumY) / denom;
-      const intercept = (sumY - slope * sumX) / n;
-      const fitted = [];
-      for (let i = 0; i < n; i++) fitted.push(intercept + slope * i);
+      const slope = (n*sumXY - sumX*sumY)/denom;
+      const intercept = (sumY - slope*sumX)/n;
+      const fitted=[];
+      for (let i=0;i<n;i++) fitted.push(intercept + slope*i);
       return fitted;
     }
 
+    // ---------- Global Chart Defaults (betere leesbaarheid) ----------
+    Chart.defaults.font.size = 13;
+    Chart.defaults.plugins.legend.labels.boxWidth = 14;
+    Chart.defaults.plugins.legend.labels.padding = 12;
+
+    function axisTickFont() { return { size: 13, weight: '600' }; }
+    function axisTitleFont() { return { size: 14, weight: '700' }; }
+
     // ---------- State ----------
     const state = {
-      months: [],             // [{key,label,date}]
-      monthLabels: [],        // [label...]
-      categories: [],         // [cat...]
+      months: [],
+      monthLabels: [],
+      categories: [],
       selectedCats: new Set(),
-      costs: {},              // cat -> cost
-      // aggregates:
-      inventory: {},          // monthLabel -> {cat: endingInvSum}
-      sales: {},              // monthLabel -> {cat: unitsSoldSum}
-      revenueGross: {},       // monthLabel -> {cat: gross}
-      revenueNet: {},         // monthLabel -> {cat: net}
-      // charts:
+      costs: {},
+      inventory: {},
+      sales: {},
+      revenueGross: {},
+      revenueNet: {},
       chartInventory: null,
       chartSales: null,
-      chartRevenue: null
+      chartRevenue: null,
+      chartRevenueMonth: null
     };
 
     // ---------- DOM ----------
@@ -529,27 +568,27 @@
     const revenueShareTable = document.getElementById('revenueShareTable');
 
     // ---------- Main ----------
-    function setStatus(msg) { statusMessage.textContent = msg || ''; }
+    function setStatus(msg){ statusMessage.textContent = msg || ''; }
 
     function resetCharts() {
-      if (state.chartInventory) { state.chartInventory.destroy(); state.chartInventory = null; }
-      if (state.chartSales) { state.chartSales.destroy(); state.chartSales = null; }
-      if (state.chartRevenue) { state.chartRevenue.destroy(); state.chartRevenue = null; }
+      if (state.chartInventory) { state.chartInventory.destroy(); state.chartInventory=null; }
+      if (state.chartSales) { state.chartSales.destroy(); state.chartSales=null; }
+      if (state.chartRevenue) { state.chartRevenue.destroy(); state.chartRevenue=null; }
+      if (state.chartRevenueMonth) { state.chartRevenueMonth.destroy(); state.chartRevenueMonth=null; }
     }
 
     function initCosts() {
       const costs = {};
       state.categories.forEach(cat => {
         const key = String(cat).toLowerCase();
-        if (defaultCosts[key] != null) costs[cat] = defaultCosts[key];
-        else costs[cat] = 0;
+        costs[cat] = (defaultCosts[key] != null) ? defaultCosts[key] : 0;
       });
       state.costs = costs;
     }
 
     function buildCategoryControls() {
       categoryCheckboxList.innerHTML = '';
-      state.selectedCats = new Set(state.categories); // default alles aan
+      state.selectedCats = new Set(state.categories);
 
       state.categories.forEach(cat => {
         const wrap = document.createElement('label');
@@ -579,6 +618,7 @@
         [...categoryCheckboxList.querySelectorAll('input[type="checkbox"]')].forEach(c => c.checked = true);
         renderAll();
       };
+
       btnAllOff.onclick = () => {
         state.selectedCats = new Set();
         [...categoryCheckboxList.querySelectorAll('input[type="checkbox"]')].forEach(c => c.checked = false);
@@ -623,7 +663,6 @@
     }
 
     function recomputeRevenueNet() {
-      // recompute net from gross + costs using stored sales
       const revNet = {};
       state.monthLabels.forEach(m => {
         revNet[m] = {};
@@ -668,8 +707,7 @@
         });
       });
 
-      // sort months
-      months.sort((a, b) => {
+      months.sort((a,b) => {
         if (a.date && b.date) return a.date - b.date;
         if (a.date && !b.date) return -1;
         if (!a.date && b.date) return 1;
@@ -680,12 +718,10 @@
       state.monthLabels = months.map(m => m.label);
       monthsInfo.textContent = state.monthLabels.length ? state.monthLabels.join(', ') : '—';
 
-      // categories set
       const catSet = new Set();
       months.forEach(m => m.entries.forEach(e => catSet.add(e.productType)));
-      state.categories = Array.from(catSet).sort((a, b) => a.localeCompare(b, 'nl-NL'));
+      state.categories = Array.from(catSet).sort((a,b) => a.localeCompare(b,'nl-NL'));
 
-      // init empty structures
       const inventory = {};
       const sales = {};
       const revenueGross = {};
@@ -700,7 +736,6 @@
         });
       });
 
-      // aggregate
       months.forEach(m => {
         const ml = m.label;
         m.entries.forEach(e => {
@@ -716,33 +751,31 @@
       state.sales = sales;
       state.revenueGross = revenueGross;
 
-      // costs + net revenue
       initCosts();
       recomputeRevenueNet();
 
-      // category UI
       buildCategoryControls();
       buildCostInputs();
     }
 
-    // ---------- Rendering ----------
     function visibleCats() {
       return state.categories.filter(c => state.selectedCats.has(c));
     }
 
+    // ---------- Render Inventory ----------
     function buildLineDatasetsForInventory(showTrend) {
       const cats = visibleCats();
       const labels = state.monthLabels;
-
       const datasets = [];
 
       cats.forEach(cat => {
         const data = labels.map(m => (state.inventory[m] && state.inventory[m][cat]) ? state.inventory[m][cat] : 0);
+
         datasets.push({
           label: cat,
           data,
           tension: 0.2,
-          borderWidth: 2,
+          borderWidth: 3,
           pointRadius: 2
         });
 
@@ -753,8 +786,8 @@
               label: `${cat} (trend)`,
               data: fitted,
               tension: 0,
-              borderWidth: 2,
-              borderDash: [6, 6],
+              borderWidth: 3,
+              borderDash: [7, 6],
               pointRadius: 0
             });
           }
@@ -765,7 +798,6 @@
     }
 
     function renderInventory() {
-      // chart
       const ctx = document.getElementById('inventoryLineChart');
       const showTrend = !!toggleTrendlines.checked;
 
@@ -780,25 +812,26 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          layout: { padding: { left: 18, right: 16, top: 10, bottom: 6 } },
           plugins: {
             legend: { position: 'bottom' },
             tooltip: {
-              callbacks: {
-                label: (ctx) => `${ctx.dataset.label}: ${num(ctx.parsed.y, 0)}`
-              }
+              callbacks: { label: (c) => `${c.dataset.label}: ${num(c.parsed.y, 0)}` }
             }
           },
           scales: {
             y: {
-              title: { display: true, text: 'Eindvoorraad (units)' },
-              ticks: { callback: (v) => num(v, 0) }
+              title: { display: true, text: 'Eindvoorraad (units)', font: axisTitleFont() },
+              ticks: { font: axisTickFont(), padding: 10, callback: (v) => num(v, 0) }
             },
-            x: { title: { display: true, text: 'Maand' } }
+            x: {
+              title: { display: true, text: 'Maand', font: axisTitleFont() },
+              ticks: { font: axisTickFont(), padding: 6 }
+            }
           }
         }
       });
 
-      // table
       const cats = visibleCats();
       const thead = inventoryTable.querySelector('thead');
       const tbody = inventoryTable.querySelector('tbody');
@@ -832,10 +865,9 @@
       });
     }
 
+    // ---------- Render Sales ----------
     function renderSales() {
-      // stacked bar
       const ctx = document.getElementById('salesBarChart');
-
       if (state.chartSales) state.chartSales.destroy();
 
       const cats = visibleCats();
@@ -852,22 +884,18 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          layout: { padding: { left: 18, right: 16, top: 10, bottom: 6 } },
           plugins: {
             legend: { position: 'bottom' },
-            tooltip: {
-              callbacks: {
-                label: (ctx) => `${ctx.dataset.label}: ${num(ctx.parsed.y, 0)}`
-              }
-            }
+            tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${num(c.parsed.y, 0)}` } }
           },
           scales: {
-            x: { stacked: true, title: { display: true, text: 'Maand' } },
-            y: { stacked: true, title: { display: true, text: 'Verkochte units' }, ticks: { callback: (v) => num(v, 0) } }
+            x: { stacked: true, title: { display: true, text: 'Maand', font: axisTitleFont() }, ticks: { font: axisTickFont(), padding: 6 } },
+            y: { stacked: true, title: { display: true, text: 'Verkochte units', font: axisTitleFont() }, ticks: { font: axisTickFont(), padding: 10, callback: (v) => num(v, 0) } }
           }
         }
       });
 
-      // table
       const thead = salesTable.querySelector('thead');
       const tbody = salesTable.querySelector('tbody');
       thead.innerHTML = '';
@@ -900,6 +928,7 @@
       });
     }
 
+    // ---------- Revenue Helpers ----------
     function totalByCategory(mapMonthCat) {
       const totals = {};
       state.categories.forEach(cat => totals[cat] = 0);
@@ -911,11 +940,12 @@
       return totals;
     }
 
+    // ---------- Render Revenue ----------
     function renderRevenue() {
       const mode = revenueModeSelect.value; // gross | net
       const monthCat = (mode === 'net') ? state.revenueNet : state.revenueGross;
 
-      // chart (bar by category)
+      // Total revenue per category
       const ctx = document.getElementById('revenueBarChart');
       if (state.chartRevenue) state.chartRevenue.destroy();
 
@@ -934,22 +964,49 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          layout: { padding: { left: 18, right: 16, top: 10, bottom: 6 } },
           plugins: {
-            legend: { display: true, position: 'bottom' },
-            tooltip: {
-              callbacks: {
-                label: (ctx) => `${ctx.dataset.label}: ${euro(ctx.parsed.y)}`
-              }
-            }
+            legend: { position: 'bottom' },
+            tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${euro(c.parsed.y)}` } }
           },
           scales: {
-            y: { title: { display: true, text: 'Omzet (€)' }, ticks: { callback: (v) => euro(v) } },
-            x: { title: { display: true, text: 'Productcategorie' } }
+            y: { title: { display: true, text: 'Omzet (€)', font: axisTitleFont() }, ticks: { font: axisTickFont(), padding: 10, callback: (v) => euro(v) } },
+            x: { title: { display: true, text: 'Productcategorie', font: axisTitleFont() }, ticks: { font: axisTickFont(), padding: 6 } }
           }
         }
       });
 
-      // revenue totals table (gross + net)
+      // NEW: Revenue per month per category (stacked)
+      const ctxM = document.getElementById('revenueMonthBarChart');
+      if (state.chartRevenueMonth) state.chartRevenueMonth.destroy();
+
+      const labels = state.monthLabels;
+      const datasetsMonth = cats.map(cat => ({
+        label: cat,
+        data: labels.map(m => (monthCat[m] && monthCat[m][cat]) ? monthCat[m][cat] : 0)
+      }));
+
+      state.chartRevenueMonth = new Chart(ctxM, {
+        type: 'bar',
+        data: { labels, datasets: datasetsMonth },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: { padding: { left: 18, right: 16, top: 10, bottom: 6 } },
+          plugins: {
+            legend: { position: 'bottom' },
+            tooltip: {
+              callbacks: { label: (c) => `${c.dataset.label}: ${euro(c.parsed.y)}` }
+            }
+          },
+          scales: {
+            x: { stacked: true, title: { display: true, text: 'Maand', font: axisTitleFont() }, ticks: { font: axisTickFont(), padding: 6 } },
+            y: { stacked: true, title: { display: true, text: 'Omzet (€)', font: axisTitleFont() }, ticks: { font: axisTickFont(), padding: 10, callback: (v) => euro(v) } }
+          }
+        }
+      });
+
+      // Revenue totals table (gross + net)
       const revHead = revenueTable.querySelector('thead');
       const revBody = revenueTable.querySelector('tbody');
       revHead.innerHTML = '';
@@ -978,7 +1035,7 @@
         revBody.appendChild(tr);
       });
 
-      // revenue share table (% of total per month)
+      // Revenue share table (% of total per month) based on gross
       const shareHead = revenueShareTable.querySelector('thead');
       const shareBody = revenueShareTable.querySelector('tbody');
       shareHead.innerHTML = '';
@@ -1001,7 +1058,6 @@
         tdMonth.textContent = m;
         tr.appendChild(tdMonth);
 
-        // total revenue that month (use gross for shares by default; you can change to net if you prefer)
         const monthTotal = cats.reduce((s, cat) => s + ((state.revenueGross[m] && state.revenueGross[m][cat]) ? state.revenueGross[m][cat] : 0), 0);
 
         cats.forEach(cat => {
@@ -1048,13 +1104,192 @@
       reader.readAsArrayBuffer(file);
     });
 
-    toggleTrendlines.addEventListener('change', () => {
-      renderInventory();
-    });
+    toggleTrendlines.addEventListener('change', () => renderInventory());
 
-    revenueModeSelect.addEventListener('change', () => {
-      renderRevenue();
-    });
+    revenueModeSelect.addEventListener('change', () => renderRevenue());
+
+    // category & cost controls
+    function extractAndAggregate(workbook) {
+      const months = [];
+
+      workbook.SheetNames.forEach(name => {
+        const sheet = workbook.Sheets[name];
+        if (!sheet) return;
+
+        const json = XLSX.utils.sheet_to_json(sheet, { defval: null });
+        const entries = [];
+
+        json.forEach(row => {
+          const productType = canonicalizeProductType(row['Product type']);
+          if (!productType) return;
+
+          let endingInv = Number(row['Ending inventory units']);
+          if (!isFinite(endingInv)) endingInv = 0;
+
+          let unitsSold = Number(row['Inventory units sold']);
+          if (!isFinite(unitsSold)) unitsSold = 0;
+
+          entries.push({ productType, endingInv, unitsSold });
+        });
+
+        months.push({
+          key: name,
+          label: name,
+          date: parseMonthLabel(name),
+          entries
+        });
+      });
+
+      months.sort((a,b) => {
+        if (a.date && b.date) return a.date - b.date;
+        if (a.date && !b.date) return -1;
+        if (!a.date && b.date) return 1;
+        return a.label.localeCompare(b.label, 'nl-NL');
+      });
+
+      state.months = months;
+      state.monthLabels = months.map(m => m.label);
+      monthsInfo.textContent = state.monthLabels.length ? state.monthLabels.join(', ') : '—';
+
+      const catSet = new Set();
+      months.forEach(m => m.entries.forEach(e => catSet.add(e.productType)));
+      state.categories = Array.from(catSet).sort((a,b) => a.localeCompare(b,'nl-NL'));
+
+      const inventory = {};
+      const sales = {};
+      const revenueGross = {};
+      state.monthLabels.forEach(ml => {
+        inventory[ml] = {};
+        sales[ml] = {};
+        revenueGross[ml] = {};
+        state.categories.forEach(cat => {
+          inventory[ml][cat] = 0;
+          sales[ml][cat] = 0;
+          revenueGross[ml][cat] = 0;
+        });
+      });
+
+      months.forEach(m => {
+        const ml = m.label;
+        m.entries.forEach(e => {
+          inventory[ml][e.productType] += e.endingInv;
+          sales[ml][e.productType] += e.unitsSold;
+
+          const price = getSellPrice(e.productType);
+          revenueGross[ml][e.productType] += (e.unitsSold * price);
+        });
+      });
+
+      state.inventory = inventory;
+      state.sales = sales;
+      state.revenueGross = revenueGross;
+
+      initCosts();
+      recomputeRevenueNet();
+
+      buildCategoryControls();
+      buildCostInputs();
+    }
+
+    function buildCategoryControls() {
+      categoryCheckboxList.innerHTML = '';
+      state.selectedCats = new Set(state.categories);
+
+      state.categories.forEach(cat => {
+        const wrap = document.createElement('label');
+        wrap.className = 'cb';
+
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = true;
+        cb.dataset.cat = cat;
+
+        const span = document.createElement('span');
+        span.textContent = cat;
+
+        cb.addEventListener('change', () => {
+          if (cb.checked) state.selectedCats.add(cat);
+          else state.selectedCats.delete(cat);
+          renderAll();
+        });
+
+        wrap.appendChild(cb);
+        wrap.appendChild(span);
+        categoryCheckboxList.appendChild(wrap);
+      });
+
+      btnAllOn.onclick = () => {
+        state.selectedCats = new Set(state.categories);
+        [...categoryCheckboxList.querySelectorAll('input[type="checkbox"]')].forEach(c => c.checked = true);
+        renderAll();
+      };
+
+      btnAllOff.onclick = () => {
+        state.selectedCats = new Set();
+        [...categoryCheckboxList.querySelectorAll('input[type="checkbox"]')].forEach(c => c.checked = false);
+        renderAll();
+      };
+
+      catHint.textContent = ' (toggle beïnvloedt alle grafieken & tabellen)';
+      categoryControls.classList.remove('hidden');
+    }
+
+    function initCosts() {
+      const costs = {};
+      state.categories.forEach(cat => {
+        const key = String(cat).toLowerCase();
+        costs[cat] = (defaultCosts[key] != null) ? defaultCosts[key] : 0;
+      });
+      state.costs = costs;
+    }
+
+    function buildCostInputs() {
+      costInputsWrap.innerHTML = '';
+      const box = document.createElement('div');
+      box.className = 'row';
+
+      state.categories.forEach(cat => {
+        const lab = document.createElement('label');
+        lab.style.minWidth = '240px';
+        lab.textContent = `${cat} (inkoopprijs)`;
+
+        const inp = document.createElement('input');
+        inp.type = 'number';
+        inp.step = '0.01';
+        inp.value = (state.costs[cat] != null ? state.costs[cat] : 0);
+
+        inp.addEventListener('input', () => {
+          const v = parseFloat(inp.value);
+          state.costs[cat] = isFinite(v) ? v : 0;
+          recomputeRevenueNet();
+          renderRevenue();
+        });
+
+        lab.appendChild(inp);
+        box.appendChild(lab);
+      });
+
+      costInputsWrap.appendChild(box);
+
+      const note = document.createElement('div');
+      note.className = 'note';
+      note.textContent = 'Netto omzet = (units × verkoopprijs) − (units × inkoopprijs).';
+      costInputsWrap.appendChild(note);
+    }
+
+    function recomputeRevenueNet() {
+      const revNet = {};
+      state.monthLabels.forEach(m => {
+        revNet[m] = {};
+        state.categories.forEach(cat => {
+          const units = (state.sales[m] && state.sales[m][cat]) ? state.sales[m][cat] : 0;
+          const gross = (state.revenueGross[m] && state.revenueGross[m][cat]) ? state.revenueGross[m][cat] : 0;
+          const cost = state.costs[cat] != null ? state.costs[cat] : 0;
+          revNet[m][cat] = gross - (units * cost);
+        });
+      });
+      state.revenueNet = revNet;
+    }
   </script>
 </body>
 </html>
